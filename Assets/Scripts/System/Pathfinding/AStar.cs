@@ -20,6 +20,7 @@ public class AStar : MonoBehaviour
     private Dictionary<Node, float> entryTimes;
     public event Action<List<PathStep>> OnPathFound;
 
+
     private void Start()
     {
         grid = GetComponent<Grid>();
@@ -27,33 +28,61 @@ public class AStar : MonoBehaviour
         ResetEntryTimes();
     }
 
-    public void StartFindPath(Vector3 startPos, Vector3 targetPos, SlimeMovement agent, bool ignoreUnreachableTarget)
+    public void StartFindPath(Vector3 startPos, Vector3 targetPos, SlimeMovement agent, float distanceFromTarget)
     {
-        Node startNode = grid.GetNodeFromWorldPoint(startPos);
-        Node targetNode;
 
-        // if (addTargetNode)
-        // {
-        //     targetNode = grid.AddTemporaryNode(targetPos);
-        // }
-        // else
-        // {
-        targetNode = grid.GetNodeFromWorldPoint(targetPos);
-        // }
+        float startTime = Time.time;
+        float estimatedEntryTime = startTime + (Vector3.Distance(startPos, targetPos) - distanceFromTarget) / agent.MovementSpeed; // Not very accurate
+        int sampleSize = 10;
+        if (distanceFromTarget != 0f
+            && TrySamplePositionAroundTarget(out Vector3 samplePos, targetPos, agent, distanceFromTarget, estimatedEntryTime, sampleSize))
+        {
+            targetPos = samplePos;
+        }
+
+        Node startNode = grid.GetNodeFromWorldPoint(startPos);
+        Node targetNode = grid.GetNodeFromWorldPoint(targetPos);
+
+        grid.ResetNodes();
 
         StopCoroutine(nameof(FindPath));
-        StartCoroutine(FindPath(startNode, targetNode, agent, Time.time, ignoreUnreachableTarget));
+        StartCoroutine(FindPath(startNode, targetNode, agent, startTime));
     }
 
-    private IEnumerator FindPath(Node startNode, Node targetNode, SlimeMovement agent, float startTime, bool ignoreUnreachableTarget)
+    private bool TrySamplePositionAroundTarget(out Vector3 samplePosition, Vector3 targetPosition,
+            SlimeMovement agent, float distanceFromTarget, float estimatedEntryTime, int sampleSize) {
+        float stepAngle = 360f / sampleSize;
+        for (int i = 0; i < sampleSize; i++)
+        {
+            float angle = stepAngle * i * Mathf.Deg2Rad;
+            Vector3 newPosition = targetPosition + new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * distanceFromTarget;
+
+            bool isWalkable = !Physics.CheckSphere(newPosition, grid.NodeRadius, grid.NotWalkableMask);
+            bool canReserve = PathReservationManager.Instance.CanReservePosition(newPosition, agent, estimatedEntryTime, float.MaxValue);
+
+            if (isWalkable && canReserve)
+            {
+                samplePosition = newPosition;
+                return true;
+            }
+        }
+
+        samplePosition = Vector3.zero;
+        return false;
+    }
+
+    private IEnumerator FindPath(Node startNode, Node targetNode, SlimeMovement agent, float startTime)
     {
         bool isPathFound = false;
         List<Node> targetNodes = grid.GetCollidingNodes(targetNode.WorldPosition, agent.EntityRadius);
         float estimatedTargetNodeEntryTime = GetDistance(startNode, targetNode) / agent.MovementSpeed;
 
-        bool isTargetNodeFree = PathReservationManager.Instance.CanReserveNode(targetNode, agent, estimatedTargetNodeEntryTime, float.MaxValue);
+        List<Node> collidingStartNodes = grid.GetCollidingNodes(startNode.WorldPosition, agent.EntityRadius);
 
-        if ((isTargetNodeFree && targetNode.IsWalkable) || ignoreUnreachableTarget)
+        bool isTargetNodeFree = PathReservationManager.Instance.CanReservePosition(targetNode.WorldPosition, agent,
+            estimatedTargetNodeEntryTime, float.MaxValue);
+
+        if (isTargetNodeFree && targetNode.IsWalkable)
         {
             BinaryHeap<Node> openSet = new();
             HashSet<Node> closedSet = new();
@@ -91,12 +120,11 @@ public class AStar : MonoBehaviour
                     }
 
                     float estimatedExitTime = entryTime + travelTime; // Most nodes are equidistant, except for temporary nodes who may cause issues
-
                     if (targetNodes.Contains(neighbourNode)) estimatedExitTime = float.MaxValue;
 
-                    if ((!targetNodes.Contains(neighbourNode) || !ignoreUnreachableTarget) && !PathReservationManager.Instance.CanReserveNode(neighbourNode, agent, entryTime, estimatedExitTime))
+                    if (!PathReservationManager.Instance.CanReservePosition(neighbourNode.WorldPosition, agent,
+                        entryTime, estimatedExitTime))
                     {
-                        // Debug.Log("Skipping node: " + neighbourNode.WorldPosition + " with target " + targetNode.WorldPosition);
                         continue;
                     }
 
@@ -106,6 +134,7 @@ public class AStar : MonoBehaviour
                         neighbourNode.GCost = newCostToNeighbour;
                         neighbourNode.HCost = GetDistance(neighbourNode, targetNode);
                         neighbourNode.Parent = currentNode;
+
 
                         if (!entryTimes.TryAdd(neighbourNode, entryTime))
                         {
@@ -129,7 +158,6 @@ public class AStar : MonoBehaviour
             Debug.Log("Target node unreachable!");
         }
 
-
         if (isPathFound)
         {
             List<PathStep> pathSteps = RetracePath(startNode, targetNode);
@@ -137,6 +165,7 @@ public class AStar : MonoBehaviour
         }
         else
         {
+            Debug.Log("Could not reach target node after iteration!");
             OnPathFound?.Invoke(null);
         }
 

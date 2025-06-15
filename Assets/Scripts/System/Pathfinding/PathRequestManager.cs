@@ -11,12 +11,12 @@ public class PathRequestManager : MonoBehaviour
     {
         public Vector3 StartPosition { get; private set; }
         public Vector3 EndPosition { get; private set; }
-        public Action<ProcessedPath> Callback { get; private set; }
+        public Action<ResultPath> Callback { get; private set; }
         public bool IgnoreUnreachableTarget { get; private set; }
         public float DistanceFromTarget { get; private set; }
         public SlimeMovement Agent { get; private set; }
 
-        public PathRequest(SlimeMovement agent, Vector3 endPosition, Action<ProcessedPath> callback, bool ignoreUnreachableTarget)
+        public PathRequest(SlimeMovement agent, Vector3 endPosition, Action<ResultPath> callback, bool ignoreUnreachableTarget)
         {
             Agent = agent;
             StartPosition = agent.transform.position;
@@ -26,7 +26,7 @@ public class PathRequestManager : MonoBehaviour
             DistanceFromTarget = 0f;
         }
 
-        public PathRequest(SlimeMovement agent, Vector3 endPosition, Action<ProcessedPath> callback, bool ignoreUnreachableTarget, float distanceFromTarget)
+        public PathRequest(SlimeMovement agent, Vector3 endPosition, Action<ResultPath> callback, bool ignoreUnreachableTarget, float distanceFromTarget)
         {
             Agent = agent;
             StartPosition = agent.transform.position;
@@ -37,21 +37,14 @@ public class PathRequestManager : MonoBehaviour
         }
     }
 
-    public struct ProcessedPath
+    public struct ResultPath
     {
-        public List<Vector3> Waypoints;
+        public List<AStar.PathStep> PathSteps;
         public float DistanceFromTarget;
 
-        public ProcessedPath(List<AStar.PathStep> pathSteps, float distanceFromTarget)
+        public ResultPath(List<AStar.PathStep> pathSteps, float distanceFromTarget)
         {
-            Waypoints = new();
-            if (pathSteps != null)
-            {
-                foreach (AStar.PathStep pathStep in pathSteps)
-                {
-                    Waypoints.Add(pathStep.Node.WorldPosition);
-                }
-            }
+            PathSteps = pathSteps;
             DistanceFromTarget = distanceFromTarget;
         }
     }
@@ -86,7 +79,7 @@ public class PathRequestManager : MonoBehaviour
     {
         PathRequest pathRequest = Instance.pathRequestQueue.Dequeue();
         if (pathSteps != null) PathReservationManager.Instance.ReservePath(pathSteps, pathRequest.Agent);
-        ProcessedPath path = new(pathSteps, pathRequest.DistanceFromTarget);
+        ResultPath path = new(pathSteps, pathRequest.DistanceFromTarget);
         pathRequest.Callback(path);
         TryProcessNextPath();
     }
@@ -99,7 +92,7 @@ public class PathRequestManager : MonoBehaviour
 
             PathRequest currentPathRequest = Instance.pathRequestQueue.Peek();
 
-            aStar.StartFindPath(currentPathRequest.StartPosition, currentPathRequest.EndPosition, currentPathRequest.Agent, currentPathRequest.IgnoreUnreachableTarget);
+            aStar.StartFindPath(currentPathRequest.StartPosition, currentPathRequest.EndPosition, currentPathRequest.Agent, currentPathRequest.DistanceFromTarget);
         }
         else if (Instance.pathRequestQueue.Count == 0)
         {

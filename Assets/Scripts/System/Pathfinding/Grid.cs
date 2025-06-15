@@ -10,6 +10,9 @@ public class Grid : MonoBehaviour
     private Node[,] grid;
     private List<Node> temporaryNodes;
 
+    public float NodeRadius => nodeRadius;
+    public LayerMask NotWalkableMask => notWalkableMask;
+
     private void Start()
     {
         ClearTemporaryNodes();
@@ -23,7 +26,7 @@ public class Grid : MonoBehaviour
         grid = new Node[gridSize.x, gridSize.x];
 
         Vector3 worldBottomLeft = transform.position - Vector3.right * worldGridSize.x / 2 - Vector3.forward * worldGridSize.y / 2;
-
+        
         for (int x = 0; x < gridSize.x; x++)
         {
             for (int y = 0; y < gridSize.y; y++)
@@ -48,6 +51,16 @@ public class Grid : MonoBehaviour
             }
         }
 
+    }
+
+    public void ResetNodes()
+    {
+        foreach (Node node in grid)
+        {
+            node.HCost = float.MaxValue;
+            node.GCost = 0f;
+            node.Parent = null;
+        }
     }
 
     public Node GetNodeFromWorldPoint(Vector3 worldPosition)
@@ -88,17 +101,6 @@ public class Grid : MonoBehaviour
             }
         }
 
-        foreach (Node temporaryNode in temporaryNodes)
-        {
-            float nodeDiameter = 2 * nodeRadius;
-            bool isNearby = Vector3.Distance(node.WorldPosition, temporaryNode.WorldPosition) < nodeDiameter;
-
-            if (isNearby)
-            {
-                neighbours.Add(temporaryNode);
-            }
-        }
-
         return neighbours;
     }
 
@@ -112,7 +114,7 @@ public class Grid : MonoBehaviour
         return temporaryNode;
     }
 
-    public Node AddWalkableNodeAroundTarget(Vector3 targetPosition, float distanceFromTarget, int sampleSize)
+    public Node FindWalkableNodeAroundTarget(Vector3 targetPosition, float distanceFromTarget, int sampleSize, float entryTime, float exitTime)
     {
         float stepAngle = 360f / sampleSize;
         for (int i = 0; i < sampleSize; i++)
@@ -121,59 +123,51 @@ public class Grid : MonoBehaviour
             Vector3 samplePosition = targetPosition + new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * distanceFromTarget;
 
             bool isWalkable = !Physics.CheckSphere(samplePosition, nodeRadius, notWalkableMask);
-
-            if (isWalkable)
-            {
-                Node temporaryNode = new(isWalkable, samplePosition, Vector2Int.zero);
-                temporaryNodes.Add(temporaryNode);
-                return temporaryNode;
-            }
         }
-        Debug.Log("No walkable node found!");
         return null;
     }
 
-    public List<Node> GetCollidingNodes(Transform obstacle)
-    {
-        List<Node> result = new();
-        Node centerNode = GetNodeFromWorldPoint(obstacle.position);
+    // public List<Node> GetCollidingNodes(Transform obstacle)
+    // {
+    //     List<Node> result = new();
+    //     Node centerNode = GetNodeFromWorldPoint(obstacle.position);
 
-        float obstacleRadius = .25f;
-        if (obstacle.TryGetComponent(out SlimeMovement slimeMovement))
-        {
-            obstacleRadius = slimeMovement.EntityRadius;
-        }
+    //     float obstacleRadius = .25f;
+    //     if (obstacle.TryGetComponent(out SlimeMovement slimeMovement))
+    //     {
+    //         obstacleRadius = slimeMovement.EntityRadius;
+    //     }
 
-        int range = Mathf.FloorToInt(obstacleRadius / nodeRadius);
-        Debug.Log(range);
+    //     int range = Mathf.FloorToInt(obstacleRadius / nodeRadius);
+    //     Debug.Log(range);
 
-        for (int x = -range; x <= range; x++)
-        {
-            for (int y = -range; y <= range; y++)
-            {
-                int nodeX = centerNode.GridPosition.x + x;
-                int nodeY = centerNode.GridPosition.y + y;
+    //     for (int x = -range; x <= range; x++)
+    //     {
+    //         for (int y = -range; y <= range; y++)
+    //         {
+    //             int nodeX = centerNode.GridPosition.x + x;
+    //             int nodeY = centerNode.GridPosition.y + y;
 
-                if (AreGridCoordinatesValid(nodeX, nodeY))
-                {
-                    result.Add(grid[nodeX, nodeY]);
-                }
-            }
-        }
+    //             if (AreGridCoordinatesValid(nodeX, nodeY))
+    //             {
+    //                 result.Add(grid[nodeX, nodeY]);
+    //             }
+    //         }
+    //     }
 
-        foreach (Node temporaryNode in temporaryNodes)
-        {
-            float nodeDiameter = 2 * nodeRadius;
-            bool isNearby = Vector3.Distance(obstacle.position, temporaryNode.WorldPosition) < nodeDiameter;
+    //     foreach (Node temporaryNode in temporaryNodes)
+    //     {
+    //         float nodeDiameter = 2 * nodeRadius;
+    //         bool isNearby = Vector3.Distance(obstacle.position, temporaryNode.WorldPosition) < nodeDiameter;
 
-            if (isNearby)
-            {
-                result.Add(temporaryNode);
-            }
-        }
+    //         if (isNearby)
+    //         {
+    //             result.Add(temporaryNode);
+    //         }
+    //     }
 
-        return result;
-    }
+    //     return result;
+    // }
 
     public List<Node> GetCollidingNodes(Vector3 obstaclePosition, float obstacleRadius)
     {

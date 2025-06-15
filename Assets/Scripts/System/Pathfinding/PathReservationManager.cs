@@ -48,32 +48,48 @@ public class PathReservationManager : MonoBehaviour
         reservations = new();
     }
 
-    public bool CanReserveNode(Node node, SlimeMovement agent, float entryTime, float exitTime)
+    public bool CanReservePosition(Vector3 worldPosition, SlimeMovement agent, float entryTime, float exitTime)
     {
-        // List<Node> affectedNodes = grid.GetCollidingNodes(node.WorldPosition, agent.EntityRadius);
+        List<Node> affectedNodes = grid.GetCollidingNodes(worldPosition, agent.EntityRadius);
 
-        // foreach (Node affectedNode in affectedNodes)
-        // {
-            if (!reservations.TryGetValue(node, out List<ReservationAgent> reservationAgents))
+        foreach (Node affectedNode in affectedNodes)
+        {
+            if (!reservations.TryGetValue(affectedNode, out List<ReservationAgent> reservationAgents))
             {
-                return true;
+                continue;
             }
 
             foreach (ReservationAgent reservationAgent in reservationAgents)
             {
                 if (agent != reservationAgent.Agent && reservationAgent.Overlaps(entryTime, exitTime))
                 {
-                    Debug.Log("Overlapping!");
                     return false;
                 }
             }
-        // }
+        }
+        return true;
+    }
+
+    public bool CanReservePath(Vector3 from, Vector3 to, float entryTime, float exitTime, SlimeMovement agent)
+    {
+        float stepPercent = 0.1f;
+        int steps = Mathf.CeilToInt(Vector3.Distance(from, to) / stepPercent);
+        for (int i = 0; i <= steps; i++)
+        {
+            float t = (float)i / steps;
+            Vector3 samplePos = Vector3.Lerp(from, to, t);
+            float sampleTime = Mathf.Lerp(entryTime, exitTime, t);
+
+            if (!CanReservePosition(samplePos, agent, sampleTime, sampleTime + 0.01f))
+            {
+                return false;
+            }
+        }
         return true;
     }
 
     public void ReservePath(List<AStar.PathStep> pathSteps, SlimeMovement agent)
     {
-        // Debug.Log("Reserving path for dynamic entity " + agent);
 
         for (int i = 0; i < pathSteps.Count; i++)
         {
@@ -97,7 +113,7 @@ public class PathReservationManager : MonoBehaviour
     public void ClearReservationsForAgent(SlimeMovement agent)
     {
         List<Node> keysToRemove = new();
-        // Debug.Log("Clearing reservations of agent " + agent);
+
         foreach (var kvp in reservations)
         {
             List<ReservationAgent> reservationAgents = kvp.Value;
@@ -116,11 +132,48 @@ public class PathReservationManager : MonoBehaviour
         }
     }
 
+    public void Debug_PrintReservationsForAgent(SlimeMovement agent)
+    {
+        bool foundReservation = false;
+
+        foreach (var kvp in reservations)
+        {
+            List<ReservationAgent> reservationAgents = kvp.Value;
+
+            foreach (var rAgent in reservationAgents)
+            {
+                if (rAgent.Agent == agent)
+                {
+                    foundReservation = true;
+                    Debug.Log("Agent " + agent.gameObject + " booked node" + kvp.Key.WorldPosition + " from " + rAgent.EntryTime + " to " + rAgent.ExitTime);
+                }
+            }
+        }
+
+        if (!foundReservation) Debug.Log("No reservations for agent " + agent.gameObject);
+
+    }
+
+    public void Debug_PrintNodeReservations(List<Node> nodes)
+    {
+        bool foundReservation = false;
+        foreach (var kvp in reservations)
+        {
+            if (nodes.Contains(kvp.Key))
+            {
+                Debug.Log($"{kvp.Key.WorldPosition} reserved");
+            }
+        }
+        
+
+        if (!foundReservation) Debug.Log("No reservations for nodes");
+
+    }
+
     public void ReserveNodesForStaticEntity(SlimeMovement agent)
     {
         List<Node> nodes = grid.GetCollidingNodes(agent.transform.position, agent.EntityRadius);
 
-        // Debug.Log("Reserving node for static entity " + node.WorldPosition + " " + agent);
         foreach (Node node in nodes)
         {
 
