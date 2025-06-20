@@ -24,10 +24,9 @@ public class SlimeMovement : MonoBehaviour
             isWalking = value;
             OnWalkingStateChanged?.Invoke(isWalking);
 
-            PathReservationManager.Instance.ClearReservationsForAgent(this);
-            
             if (!isWalking)
             {
+                PathReservationManager.Instance.ClearReservationsForAgent(this);
                 PathReservationManager.Instance.ReserveNodesForStaticEntity(this);
             }
         }
@@ -56,7 +55,6 @@ public class SlimeMovement : MonoBehaviour
         {
             IsWalking = false;
             StopCoroutine(nameof(FollowPathCoroutine));
-            // StopCoroutine(nameof(FollowPathToTargetCoroutine));
         }
     }
 
@@ -67,7 +65,6 @@ public class SlimeMovement : MonoBehaviour
             IsWalking = true;
             currentPathWaypoints = PathProcessor.ProcessPath(path.PathSteps, this);
             StopCoroutine(nameof(FollowPathCoroutine));
-            // StopCoroutine(nameof(FollowPathToTargetCoroutine));
             StartCoroutine(nameof(FollowPathCoroutine));
         }
         else
@@ -77,28 +74,7 @@ public class SlimeMovement : MonoBehaviour
             OnPathComplete?.Invoke(this);
         }
     }
-
-    // protected void StartFollowPathToTarget(PathRequestManager.ResultPath path)
-    // {
-    //     if (path.PathSteps != null && path.PathSteps.Count > 0)
-    //     {
-    //         IsWalking = true;
-    //         currentPathWaypoints = PathProcessor.ProcessPath(path.PathSteps, this);
-    //         // currentPathWaypoints = path.Waypoints;
-    //         // currentPathWaypoints = GenerateSpline(SimplifyPath(path.Waypoints), 20);
-    //         StopCoroutine(nameof(FollowPathCoroutine));
-    //         StopCoroutine(nameof(FollowPathToTargetCoroutine));
-    //         StartCoroutine(nameof(FollowPathToTargetCoroutine), path.DistanceFromTarget);
-    //     }
-    //     else
-    //     {
-    //         Debug.Log("Path is null!");
-    //         IsWalking = false;
-    //         OnPathComplete?.Invoke(this);
-    //     }
-    // }
-
-
+    
     private IEnumerator FollowPathCoroutine()
     {
         int pathIndex = 0;
@@ -122,49 +98,15 @@ public class SlimeMovement : MonoBehaviour
                 transform.rotation,
                 Quaternion.LookRotation(currentPathWaypoints[pathIndex] - transform.position),
                 Time.deltaTime * turnSpeed);
-            
+
             transform.position = Vector3.MoveTowards(
                 transform.position,
                 currentPathWaypoints[pathIndex],
                 movementSpeed * Time.deltaTime);
-            
+
             yield return null;
         }
     }
-
-    // private IEnumerator FollowPathToTargetCoroutine(float followDistance)
-    // {
-    //     int pathIndex = 0;
-    //     float distanceToTarget = Vector3.Distance(transform.position, currentPathWaypoints[currentPathWaypoints.Count - 1]);
-    //     float errorMargin = 0.05f;
-
-    //     while (IsWalking)
-    //     {
-    //         Vector3 destination = currentPathWaypoints[pathIndex];
-    //         if (Vector3.Distance(transform.position, destination) < errorMargin)
-    //         {
-    //             pathIndex++;
-
-    //             if (pathIndex >= currentPathWaypoints.Count) break;
-    //         }
-
-    //         transform.position = Vector3.MoveTowards(
-    //             transform.position,
-    //             destination,
-    //             movementSpeed * Time.deltaTime);
-
-    //         transform.rotation = Quaternion.Lerp(
-    //             transform.rotation,
-    //             Quaternion.LookRotation(destination - transform.position),
-    //             Time.deltaTime * turnSpeed);
-
-    //         distanceToTarget = Vector3.Distance(transform.position, currentPathWaypoints[currentPathWaypoints.Count - 1]);
-    //         yield return null;
-    //     }
-
-    //     IsWalking = false;
-    //     OnPathComplete?.Invoke(this);
-    // }
 
     private void OnDrawGizmos()
     {

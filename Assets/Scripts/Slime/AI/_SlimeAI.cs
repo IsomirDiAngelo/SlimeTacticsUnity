@@ -25,17 +25,17 @@ public class SlimeAI : MonoBehaviour, IInteractable
 
     protected SlimeMovement slimeMovement;
     protected SlimeCombat slimeCombat;
+    public SlimeCombat SlimeCombatComponent => slimeCombat;
     protected BehaviorState behaviorState;
 
-    protected SlimeCombat currentTarget;
+    protected SlimeAI currentTarget;
 
     [SerializeField] protected Faction slimeFaction;
     public Faction SlimeFaction { get { return slimeFaction; } }
     [SerializeField] protected Vector3[] patrolPathWaypoints;
+    [SerializeField] protected BehaviorState defaultBehaviorState;
 
     private int patrolPathIndex;
-
-    private Vector3 lastTargetPosition;
 
     private void Start()
     {
@@ -57,7 +57,7 @@ public class SlimeAI : MonoBehaviour, IInteractable
     // LateStart is meant to be overriden by child classes to add additional parameters to initialize during Start()
     protected virtual void LateStart()
     {
-        SetBehaviorState(BehaviorState.Patrol);
+        SetBehaviorState(defaultBehaviorState);
     }
 
     private void SlimeCombatStats_OnHealthChange(float newHealthAmount)
@@ -75,9 +75,14 @@ public class SlimeAI : MonoBehaviour, IInteractable
         behaviorState = newBehaviorState;
     }
 
-    protected void SetCurrentTarget(SlimeCombat target)
+    protected void SetCurrentTarget(SlimeAI target)
     {
         currentTarget = target;
+    }
+
+    public bool IsDead()
+    {
+        return behaviorState == BehaviorState.Dead;
     }
 
     private void OnBehaviorStateChanged(BehaviorState newBehaviorState)
@@ -93,12 +98,16 @@ public class SlimeAI : MonoBehaviour, IInteractable
             case BehaviorState.Idle:
                 // Do nothing
                 break;
+            case BehaviorState.Follow:
+                SetCurrentTarget(PlayerAI.Instance);
+                StartCoroutine(nameof(ScoutTargetCoroutine));
+                StartCoroutine(nameof(FollowTargetCoroutine), slimeCombat.CombatStats.TargetRange);
+                break;
             case BehaviorState.Patrol:
                 StartCoroutine(nameof(ScoutTargetCoroutine));
                 StartCoroutine(nameof(FollowPatrolPathCoroutine));
                 break;
             case BehaviorState.Chase:
-                BehaviorState defaultBehaviorState = this is PlayerAI ? BehaviorState.Idle : BehaviorState.Patrol;
                 StartCoroutine(nameof(ChaseTargetCoroutine), defaultBehaviorState); // Default to previous state when target becomes unreachable
                 StartCoroutine(nameof(FollowTargetCoroutine), slimeCombat.CombatStats.AttackRange);
                 break;
@@ -167,8 +176,10 @@ public class SlimeAI : MonoBehaviour, IInteractable
     {
         while (true)
         {
-            if (slimeCombat.TryAcquireClosestTarget(out currentTarget, GetEnemyFaction()))
+            if (slimeCombat.TryAcquireClosestTarget(out SlimeAI newTarget, GetEnemyFaction()))
             {
+                currentTarget = newTarget;
+
                 if (slimeCombat.IsTargetInAttackRange(currentTarget))
                 {
                     SetBehaviorState(BehaviorState.Attack);
@@ -201,7 +212,7 @@ public class SlimeAI : MonoBehaviour, IInteractable
             }
             else
             {
-                if (slimeCombat.TryAcquireClosestTarget(out SlimeCombat newTarget, GetEnemyFaction()) && newTarget != currentTarget)
+                if (slimeCombat.TryAcquireClosestTarget(out SlimeAI newTarget, GetEnemyFaction()) && newTarget != currentTarget)
                 {
                     currentTarget = newTarget;
                 }
@@ -214,22 +225,16 @@ public class SlimeAI : MonoBehaviour, IInteractable
     private IEnumerator FollowTargetCoroutine(float followDistance)
     {
         float recalculatePathThreshold = 0.1f;
+        Vector3 lastTargetPosition = transform.position;
 
         while (currentTarget != null && !currentTarget.IsDead())
         {
-            Debug.Log(gameObject + " tries to follow target: " + currentTarget);
-            // Debug.Log(lastTargetPosition + " " + currentTarget.transform.position);
-            // if (Vector3.Distance(lastTargetPosition, currentTarget.transform.position) > recalculatePathThreshold && Vector3.Distance(transform.position, currentTarget.transform.position) > followDistance)
-            // if (Vector3.Distance(transform.position, currentTarget.transform.position) > followDistance)
-            // {
-            //     if (Vector3.Distance(lastTargetPosition, currentTarget.transform.position) > recalculatePathThreshold)
-            //     {
-            //         slimeMovement.RequestAndFollowPath(currentTarget.transform.position, true, followDistance);
-            //         lastTargetPosition = currentTarget.transform.position;
-            //     }
-            // }
-            slimeMovement.RequestAndFollowPath(currentTarget.transform.position, true, followDistance);
-            yield return new WaitForSeconds(.5f); 
+            if (Vector3.Distance(lastTargetPosition, currentTarget.transform.position) > recalculatePathThreshold)
+            {
+                slimeMovement.RequestAndFollowPath(currentTarget.transform.position, true, followDistance);
+                lastTargetPosition = currentTarget.transform.position;
+            }
+            yield return new WaitForSeconds(.5f);
         }
     }
 
@@ -246,7 +251,7 @@ public class SlimeAI : MonoBehaviour, IInteractable
             if (!slimeCombat.IsAttacking)
             {
                 slimeMovement.Stop();
-                slimeCombat.StartAttack(currentTarget);
+                slimeCombat.StartAttack(currentTarget.SlimeCombatComponent);
             }
             yield return null;
         }
@@ -257,16 +262,16 @@ public class SlimeAI : MonoBehaviour, IInteractable
     // Player commands
     public void Interact(SlimeAI actor)
     {
-        if (actor.behaviorState != BehaviorState.Dead && actor.SlimeFaction == GetEnemyFaction())
+        if (!actor.IsDead() && actor.SlimeFaction == GetEnemyFaction())
         {
-            actor.SetCurrentTarget(slimeCombat);
+            actor.SetCurrentTarget(this);
             actor.SetBehaviorState(BehaviorState.Chase);
         }
     }
 
     private void InputManager_OnMove(Vector3 worldPosition, SlimeAI actor)
     {
-        if (actor == this && behaviorState != BehaviorState.Dead && SlimeFaction == Faction.Ally)
+        if (actor == this && !IsDead() && SlimeFaction == Faction.Ally)
         {
             actor.TryMoveTo(worldPosition);
         }

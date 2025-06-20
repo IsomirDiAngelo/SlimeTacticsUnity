@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -106,7 +105,9 @@ public class PathReservationManager : MonoBehaviour
                 exitTime = float.MaxValue;
             }
 
-            ReserveNodesForDynamicEntity(node, agent, entryTime, exitTime);
+            float bufferTime = .5f;
+
+            ReserveNodesForDynamicEntity(node, agent, entryTime - bufferTime, exitTime + bufferTime);
         }
     }
 

@@ -83,7 +83,7 @@ public class SlimeCombat : MonoBehaviour
     }
     private bool isCasting;
 
-    private void Start()
+    private void Awake()
     {
         if (slimeBaseStatsSO != null)
         {
@@ -114,13 +114,13 @@ public class SlimeCombat : MonoBehaviour
         return CombatStats.CurrentHealth <= 0;
     }
 
-    public bool IsTargetInAttackRange(SlimeCombat target)
+    public bool IsTargetInAttackRange(SlimeAI target)
     {
         float errorMargin = 0.25f;
         return Math.Abs(Vector3.Distance(target.transform.position, transform.position) - CombatStats.AttackRange) <= errorMargin;
     }
 
-    public bool TryAcquireClosestTarget(out SlimeCombat target, SlimeAI.Faction faction)
+    public bool TryAcquireClosestTarget(out SlimeAI target, SlimeAI.Faction faction)
     {
         target = null;
         Collider[] colliders = Physics.OverlapSphere(transform.position, CombatStats.TargetRange);
@@ -131,12 +131,10 @@ public class SlimeCombat : MonoBehaviour
             if (collider.TryGetComponent(out SlimeAI collidingSlime) && collidingSlime.SlimeFaction == faction)
             {
                 float distance = Vector3.Distance(transform.position, collidingSlime.transform.position);
-                if (distance < closestDistance)
+                if (distance < closestDistance && !collidingSlime.IsDead())
                 {
                     closestDistance = distance;
-                    if (collidingSlime.TryGetComponent(out SlimeCombat newTarget) && !newTarget.IsDead()) {
-                        target = newTarget; 
-                    }
+                    target = collidingSlime; 
                 }
             }
         }

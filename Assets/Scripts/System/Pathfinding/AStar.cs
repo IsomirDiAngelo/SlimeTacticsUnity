@@ -34,15 +34,22 @@ public class AStar : MonoBehaviour
         float startTime = Time.time;
         float estimatedEntryTime = startTime + (Vector3.Distance(startPos, targetPos) - distanceFromTarget) / agent.MovementSpeed; // Not very accurate
         int sampleSize = 10;
-        if (distanceFromTarget != 0f
-            && TrySamplePositionAroundTarget(out Vector3 samplePos, targetPos, agent, distanceFromTarget, estimatedEntryTime, sampleSize))
-        {
-            targetPos = samplePos;
+        if (distanceFromTarget != 0f) {
+            if (TrySamplePositionAroundTarget(out Vector3 samplePos, targetPos, agent, distanceFromTarget, estimatedEntryTime, sampleSize))
+            {
+                Debug.Log($"Sampled target node in {samplePos} vs {targetPos}");
+                targetPos = samplePos;
+            }
+            else
+            {
+                Debug.Log("Unable to sample node around target!");
+            }
         }
 
         Node startNode = grid.GetNodeFromWorldPoint(startPos);
         Node targetNode = grid.GetNodeFromWorldPoint(targetPos);
 
+        PathReservationManager.Instance.ClearReservationsForAgent(agent);
         grid.ResetNodes();
 
         StopCoroutine(nameof(FindPath));

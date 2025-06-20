@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 public class InputManager : MonoBehaviour
 {
@@ -9,6 +10,7 @@ public class InputManager : MonoBehaviour
     public event Action<Transform> OnInteract;
     public event Action<IInteractable> OnHoveredInteractableChanged;
     public event Action<IInteractable> OnSelectedInteractableChanged;
+    public event Action<Vector3> OnSpawn;
 
     private PlayerInputActions playerInputActions;
 
@@ -17,6 +19,8 @@ public class InputManager : MonoBehaviour
 
     [SerializeField] private LayerMask terrainLayerMask;
     [SerializeField] private PlayerAI player;
+
+    private bool isHoveringUI;
 
     private void Awake()
     {
@@ -45,6 +49,11 @@ public class InputManager : MonoBehaviour
         TryGetInteractableOnCursor(out Transform interactableTransform);
     }
 
+    public void SetHoveringUI(bool hoveringUI)
+    {
+        isHoveringUI = hoveringUI;
+    }
+
     private SlimeAI GetActor()
     {
         SlimeAI actor = player;
@@ -64,6 +73,11 @@ public class InputManager : MonoBehaviour
                 selectedInteractable = interactableComponent;
                 hoveredInteractable = null;
             }
+        }
+        else if (TryGetMouseTerrainWorldPosition(out Vector3 mouseWorldPosition))
+        {
+            OnSpawn?.Invoke(mouseWorldPosition);
+            selectedInteractable = null;
         }
         else
         {
@@ -103,7 +117,7 @@ public class InputManager : MonoBehaviour
     {
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
-        if (Physics.Raycast(ray, out RaycastHit hit))
+        if (!isHoveringUI && Physics.Raycast(ray, out RaycastHit hit))
         {
             if (hit.transform.TryGetComponent(out IInteractable interactableComponent))
             {
@@ -124,7 +138,7 @@ public class InputManager : MonoBehaviour
     {
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
-        if (Physics.Raycast(ray, out RaycastHit hit, terrainLayerMask))
+        if (!isHoveringUI && Physics.Raycast(ray, out RaycastHit hit, terrainLayerMask))
         {
             mouseWorldPosition = hit.point;
             return true;

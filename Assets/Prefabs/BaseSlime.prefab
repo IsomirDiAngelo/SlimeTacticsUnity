@@ -452,7 +452,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   flashColor: {r: 1, g: 0, b: 0, a: 1}
-  flashDuration: 1
+  flashDuration: 0.2
   flashIntensity: 5
 --- !u!114 &4769618833706600277
 MonoBehaviour:
@@ -467,9 +467,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   slimeFaction: 0
-  patrolPathWaypoints:
-  - {x: 0, y: 0, z: 0}
-  - {x: 0, y: 0, z: 4}
+  patrolPathWaypoints: []
+  defaultBehaviorState: 1
 --- !u!114 &5282809511912152661
 MonoBehaviour:
   m_ObjectHideFlags: 0
