@@ -9,8 +9,10 @@ public class SlimeAI : MonoBehaviour, IInteractable
         Idle,
         Follow,
         Patrol,
-        Chase,
+        ChaseAttack,
+        ChaseEat,
         Attack,
+        Eat,
         Dead
     }
 
@@ -34,6 +36,8 @@ public class SlimeAI : MonoBehaviour, IInteractable
     public Faction SlimeFaction { get { return slimeFaction; } }
     [SerializeField] protected Vector3[] patrolPathWaypoints;
     [SerializeField] protected BehaviorState defaultBehaviorState;
+
+    public event Action OnTryEat;
 
     private int patrolPathIndex;
 
@@ -71,8 +75,8 @@ public class SlimeAI : MonoBehaviour, IInteractable
 
     protected void SetBehaviorState(BehaviorState newBehaviorState)
     {
-        OnBehaviorStateChanged(newBehaviorState);
         behaviorState = newBehaviorState;
+        OnBehaviorStateChanged();
     }
 
     protected void SetCurrentTarget(SlimeAI target)
@@ -85,15 +89,20 @@ public class SlimeAI : MonoBehaviour, IInteractable
         return behaviorState == BehaviorState.Dead;
     }
 
-    private void OnBehaviorStateChanged(BehaviorState newBehaviorState)
+    private void OnBehaviorStateChanged()
     {
         StopAllCoroutines();
         slimeMovement.Stop();
         slimeCombat.CancelAttack();
 
+        HandleBehavior();
+    }
+
+    protected virtual void HandleBehavior()
+    {
         // TODO: Rework to use Update() instead of multiple concurring coroutines
 
-        switch (newBehaviorState)
+        switch (behaviorState)
         {
             case BehaviorState.Idle:
                 // Do nothing
@@ -107,8 +116,8 @@ public class SlimeAI : MonoBehaviour, IInteractable
                 StartCoroutine(nameof(ScoutTargetCoroutine));
                 StartCoroutine(nameof(FollowPatrolPathCoroutine));
                 break;
-            case BehaviorState.Chase:
-                StartCoroutine(nameof(ChaseTargetCoroutine), defaultBehaviorState); // Default to previous state when target becomes unreachable
+            case BehaviorState.ChaseAttack:
+                StartCoroutine(ChaseTargetCoroutine(defaultBehaviorState, BehaviorState.Attack));
                 StartCoroutine(nameof(FollowTargetCoroutine), slimeCombat.CombatStats.AttackRange);
                 break;
             case BehaviorState.Attack:
@@ -131,12 +140,13 @@ public class SlimeAI : MonoBehaviour, IInteractable
         }
     }
 
-    private void TryMoveTo(Vector3 worldPosition) {
+    protected void TryMoveTo(Vector3 worldPosition)
+    {
         SetBehaviorState(BehaviorState.Idle);
         slimeMovement.RequestAndFollowPath(worldPosition, false);
     }
 
-    private IEnumerator FollowPatrolPathCoroutine()
+    protected IEnumerator FollowPatrolPathCoroutine()
     {
         int patrolPathIncrement = 1;
 
@@ -172,7 +182,7 @@ public class SlimeAI : MonoBehaviour, IInteractable
         }
     }
 
-    private IEnumerator ScoutTargetCoroutine()
+    protected IEnumerator ScoutTargetCoroutine()
     {
         while (true)
         {
@@ -186,7 +196,7 @@ public class SlimeAI : MonoBehaviour, IInteractable
                 }
                 else
                 {
-                    SetBehaviorState(BehaviorState.Chase);
+                    SetBehaviorState(BehaviorState.ChaseAttack);
                 }
                 yield break;
             }
@@ -194,7 +204,7 @@ public class SlimeAI : MonoBehaviour, IInteractable
         }
     }
 
-    private IEnumerator ChaseTargetCoroutine(BehaviorState defaultBehaviorState)
+    protected IEnumerator ChaseTargetCoroutine(BehaviorState defaultBehaviorState, BehaviorState nextState)
     {
 
         while (true)
@@ -207,7 +217,7 @@ public class SlimeAI : MonoBehaviour, IInteractable
 
             if (slimeCombat.IsTargetInAttackRange(currentTarget))
             {
-                SetBehaviorState(BehaviorState.Attack);
+                SetBehaviorState(nextState);
                 yield break;
             }
             else
@@ -222,7 +232,7 @@ public class SlimeAI : MonoBehaviour, IInteractable
         }
     }
 
-    private IEnumerator FollowTargetCoroutine(float followDistance)
+    protected IEnumerator FollowTargetCoroutine(float followDistance)
     {
         float recalculatePathThreshold = 0.1f;
         Vector3 lastTargetPosition = transform.position;
@@ -238,13 +248,13 @@ public class SlimeAI : MonoBehaviour, IInteractable
         }
     }
 
-    private IEnumerator AttackCoroutine()
+    protected IEnumerator AttackCoroutine()
     {
         while (true)
         {
             if (currentTarget == null || currentTarget.IsDead() || !slimeCombat.IsTargetInAttackRange(currentTarget))
             {
-                SetBehaviorState(BehaviorState.Chase);
+                SetBehaviorState(BehaviorState.ChaseAttack);
                 yield break;
             }
 
@@ -265,7 +275,7 @@ public class SlimeAI : MonoBehaviour, IInteractable
         if (!actor.IsDead() && actor.SlimeFaction == GetEnemyFaction())
         {
             actor.SetCurrentTarget(this);
-            actor.SetBehaviorState(BehaviorState.Chase);
+            actor.SetBehaviorState(BehaviorState.ChaseAttack);
         }
     }
 
@@ -275,6 +285,11 @@ public class SlimeAI : MonoBehaviour, IInteractable
         {
             actor.TryMoveTo(worldPosition);
         }
+    }
+
+    public void TryEat()
+    {
+        OnTryEat?.Invoke();
     }
 
 }

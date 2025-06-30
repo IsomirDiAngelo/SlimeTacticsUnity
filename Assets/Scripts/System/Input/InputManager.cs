@@ -42,7 +42,9 @@ public class InputManager : MonoBehaviour
         playerInputActions.Player.Zoom.performed += Zoom_performed;
         playerInputActions.Player.MoveInteract.performed += MoveInteract_performed;
         playerInputActions.Player.Select.performed += Select_performed;
+        playerInputActions.Player.Eat.performed += Eat_performed;
     }
+
 
     private void Update()
     {
@@ -62,6 +64,17 @@ public class InputManager : MonoBehaviour
             actor = interactableSlimeAI;
         }
         return actor;
+    }
+
+    private void Eat_performed(UnityEngine.InputSystem.InputAction.CallbackContext context)
+    {
+        if (TryGetInteractableOnCursor(out Transform interactableTransform))
+        {
+            if (interactableTransform.TryGetComponent(out Eatable eatableComponent))
+            {
+                eatableComponent.Eat();
+            }
+        }
     }
 
     private void Select_performed(UnityEngine.InputSystem.InputAction.CallbackContext context)

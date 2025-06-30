@@ -37,6 +37,11 @@ public class SlimeMovement : MonoBehaviour
         IsWalking = false;
     }
 
+    private void OnDestroy()
+    {
+        PathReservationManager.Instance.ClearReservationsForAgent(this);
+    }
+
     public void RequestAndFollowPath(Vector3 destination, bool ignoreUnreachableTarget)
     {
         PathRequestManager.PathRequest pathRequest = new(this, destination, StartFollowPath, ignoreUnreachableTarget);

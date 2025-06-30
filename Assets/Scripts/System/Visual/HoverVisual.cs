@@ -22,6 +22,12 @@ public class HoverVisual : MonoBehaviour
         Hide();
     }
 
+    private void OnDestroy()
+    {
+        InputManager.Instance.OnHoveredInteractableChanged -= InputManager_OnHoveredInteractableChanged;
+        InputManager.Instance.OnSelectedInteractableChanged -= InputManager_OnSelectedInteractableChanged;
+    }
+
     private void InputManager_OnHoveredInteractableChanged(IInteractable hoveredInteractable)
     {
         if (hoveredInteractable == interactableComponent)

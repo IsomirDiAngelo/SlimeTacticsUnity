@@ -19,6 +19,11 @@ public class SelectedVisual : MonoBehaviour
         Hide();
     }
 
+    private void OnDestroy()
+    {
+        InputManager.Instance.OnSelectedInteractableChanged -= InputManager_OnSelectedInteractableChanged;  
+    }
+
     private void InputManager_OnSelectedInteractableChanged(IInteractable selectedInteractable)
     {
         if (selectedInteractable == interactableComponent)

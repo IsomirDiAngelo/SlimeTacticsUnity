@@ -37,7 +37,6 @@ public class AStar : MonoBehaviour
         if (distanceFromTarget != 0f) {
             if (TrySamplePositionAroundTarget(out Vector3 samplePos, targetPos, agent, distanceFromTarget, estimatedEntryTime, sampleSize))
             {
-                Debug.Log($"Sampled target node in {samplePos} vs {targetPos}");
                 targetPos = samplePos;
             }
             else
@@ -172,7 +171,6 @@ public class AStar : MonoBehaviour
         }
         else
         {
-            Debug.Log("Could not reach target node after iteration!");
             OnPathFound?.Invoke(null);
         }
 
